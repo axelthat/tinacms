@@ -2,12 +2,12 @@
 
 */
 
-import { v2 as cloudinary } from 'cloudinary';
-import type { Media, MediaListOptions } from 'tinacms';
-import path from 'path';
-import { NextApiRequest, NextApiResponse } from 'next';
-import multer from 'multer';
-import { promisify } from 'util';
+import { v2 as cloudinary } from "cloudinary";
+import type { Media, MediaListOptions } from "tinacms";
+import path from "path";
+import { NextApiRequest, NextApiResponse } from "next";
+import multer from "multer";
+import { promisify } from "util";
 
 export interface CloudinaryConfig {
   cloud_name: string;
@@ -18,6 +18,7 @@ export interface CloudinaryConfig {
 
 export interface CloudinaryOptions {
   useHttps?: boolean;
+  directory?: string;
 }
 
 export const mediaHandlerConfig = {
@@ -36,15 +37,15 @@ export const createMediaHandler = (
     const isAuthorized = await config.authorized(req, res);
     // make sure the user is authorized to upload
     if (!isAuthorized) {
-      res.status(401).json({ message: 'sorry this user is unauthorized' });
+      res.status(401).json({ message: "sorry this user is unauthorized" });
       return;
     }
     switch (req.method) {
-      case 'GET':
+      case "GET":
         return listMedia(req, res, options);
-      case 'POST':
-        return uploadMedia(req, res);
-      case 'DELETE':
+      case "POST":
+        return uploadMedia(req, res, options);
+      case "DELETE":
         return deleteAsset(req, res);
       default:
         res.end(404);
@@ -52,33 +53,37 @@ export const createMediaHandler = (
   };
 };
 
-async function uploadMedia(req: NextApiRequest, res: NextApiResponse) {
+async function uploadMedia(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  opts?: CloudinaryOptions
+) {
   const upload = promisify(
     multer({
       storage: multer.diskStorage({
         // @ts-ignore
         directory: (req, file, cb) => {
-          cb(null, '/tmp');
+          cb(null, "/tmp");
         },
         filename: (req, file, cb) => {
           cb(null, file.originalname);
         },
       }),
-    }).single('file')
+    }).single("file")
   );
 
   // @ts-ignore
   await upload(req, res);
 
-  const { directory } = req.body;
+  const directory = path.join(opts?.directory || "", req.body.directory || "");
 
   try {
     //@ts-ignore
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: directory.replace(/^\//, ''),
+      folder: directory.replace(/^\//, ""),
       use_filename: true,
       overwrite: false,
-      resource_type: 'auto',
+      resource_type: "auto",
     });
 
     res.json(result);
@@ -94,15 +99,19 @@ async function listMedia(
 ) {
   try {
     const mediaListOptions: MediaListOptions = {
-      directory: (req.query.directory as string) || '""',
+      directory:
+        path.join(
+          opts?.directory || "",
+          (req.query.directory as string) || ""
+        ) || '""',
       limit: parseInt(req.query.limit as string, 10) || 500,
       offset: req.query.offset as string,
-      filesOnly: req.query.filesOnly === 'true' || false,
+      filesOnly: req.query.filesOnly === "true" || false,
     };
 
     const useRootDirectory =
       !mediaListOptions.directory ||
-      mediaListOptions.directory === '/' ||
+      mediaListOptions.directory === "/" ||
       mediaListOptions.directory === '""';
 
     const query = useRootDirectory
@@ -144,7 +153,7 @@ async function listMedia(
       if (e.error?.message.startsWith("Can't find folder with path")) {
         // ignore
       } else {
-        console.error('Error getting folders');
+        console.error("Error getting folders");
         console.error(e);
         throw e;
       }
@@ -155,10 +164,10 @@ async function listMedia(
         name: string;
         path: string;
       }): Media {
-        'empty-repo/004';
+        "empty-repo/004";
         return {
           id: folder.path,
-          type: 'dir',
+          type: "dir",
           filename: path.basename(folder.path),
           directory: path.dirname(folder.path),
         };
@@ -184,10 +193,10 @@ async function listMedia(
  * normalize it into a string here.
  */
 const findErrorMessage = (e: any) => {
-  if (typeof e == 'string') return e;
+  if (typeof e == "string") return e;
   if (e.message) return e.message;
   if (e.error && e.error.message) return e.error.message;
-  return 'an error occurred';
+  return "an error occurred";
 };
 
 async function deleteAsset(req: NextApiRequest, res: NextApiResponse) {
@@ -209,11 +218,11 @@ function getCloudinaryToTinaFunc(opts: CloudinaryOptions) {
 
     // Default to true
     let useHttps = true;
-    if (typeof opts !== 'undefined' && typeof opts.useHttps !== 'undefined') {
+    if (typeof opts !== "undefined" && typeof opts.useHttps !== "undefined") {
       useHttps = opts.useHttps;
     }
 
-    const sel = useHttps ? ('secure_url' as const) : ('url' as const);
+    const sel = useHttps ? ("secure_url" as const) : ("url" as const);
 
     const filename = path.basename(file.public_id);
     const directory = path.dirname(file.public_id);
@@ -224,17 +233,17 @@ function getCloudinaryToTinaFunc(opts: CloudinaryOptions) {
       directory,
       src: file[sel],
       thumbnails: {
-        '75x75': transformCloudinaryImage(file[sel], 'w_75,h_75,c_fit,q_auto'),
-        '400x400': transformCloudinaryImage(
+        "75x75": transformCloudinaryImage(file[sel], "w_75,h_75,c_fit,q_auto"),
+        "400x400": transformCloudinaryImage(
           file[sel],
-          'w_400,h_400,c_fit,q_auto'
+          "w_400,h_400,c_fit,q_auto"
         ),
-        '1000x1000': transformCloudinaryImage(
+        "1000x1000": transformCloudinaryImage(
           file[sel],
-          'w_1000,h_1000,c_fit,q_auto'
+          "w_1000,h_1000,c_fit,q_auto"
         ),
       },
-      type: 'file',
+      type: "file",
     };
   };
 }
@@ -243,10 +252,10 @@ function transformCloudinaryImage(
   url: string,
   transformations: string
 ): string {
-  const parts = url.split('/image/upload/');
+  const parts = url.split("/image/upload/");
 
   if (parts.length === 2) {
-    return parts[0] + '/image/upload/' + transformations + '/' + parts[1];
+    return parts[0] + "/image/upload/" + transformations + "/" + parts[1];
   }
 
   return url;
