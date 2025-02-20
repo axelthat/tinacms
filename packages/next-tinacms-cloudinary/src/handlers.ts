@@ -18,6 +18,7 @@ export interface CloudinaryConfig {
 
 export interface CloudinaryOptions {
   useHttps?: boolean
+  directory?: string
 }
 
 export const mediaHandlerConfig = {
@@ -43,7 +44,7 @@ export const createMediaHandler = (
       case 'GET':
         return listMedia(req, res, options)
       case 'POST':
-        return uploadMedia(req, res)
+        return uploadMedia(req, res, options)
       case 'DELETE':
         return deleteAsset(req, res)
       default:
@@ -52,7 +53,11 @@ export const createMediaHandler = (
   }
 }
 
-async function uploadMedia(req: NextApiRequest, res: NextApiResponse) {
+async function uploadMedia(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  opts?: CloudinaryOptions
+) {
   const upload = promisify(
     multer({
       storage: multer.diskStorage({
@@ -70,7 +75,7 @@ async function uploadMedia(req: NextApiRequest, res: NextApiResponse) {
   // @ts-ignore
   await upload(req, res)
 
-  const { directory } = req.body
+  const directory = path.join(opts?.directory || '', req.body.directory || '')
 
   try {
     //@ts-ignore
@@ -94,7 +99,11 @@ async function listMedia(
 ) {
   try {
     const mediaListOptions: MediaListOptions = {
-      directory: (req.query.directory as string) || '""',
+      directory:
+        path.join(
+          opts?.directory || '',
+          (req.query.directory as string) || ''
+        ) || '""',
       limit: parseInt(req.query.limit as string, 10) || 500,
       offset: req.query.offset as string,
       filesOnly: req.query.filesOnly === 'true' || false,
